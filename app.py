@@ -322,7 +322,7 @@ def emoji(n):
     m = {
         'programación': '💻', 'programacion': '💻', 'coding': '💻',
         'michishop': '🛍️', 'shop': '🛍️',
-        'ejercicio': '🏋️', 'gym': '🏋️', 'entrenamiento': '🏋️', 'running': '🏃',
+        'ejercicio': '🏋️', 'gym': '🏋️', 'gimnasio': '🏋️', 'entrenamiento': '🏋️', 'running': '🏃',
         'lectura': '📚', 'leer': '📚', 'reading': '📚', 'libro': '📚',
         'meditación': '🧘', 'meditacion': '🧘', 'meditate': '🧘',
         'agua': '💧', 'water': '💧',
@@ -330,9 +330,10 @@ def emoji(n):
         'ingles': '🇬🇧', 'english': '🇬🇧', 'inglés': '🇬🇧',
         'guitarra': '🎸', 'music': '🎸', 'música': '🎸',
         'dios': '🙏', 'biblia': '📖',
-        'facultad': '🎓', 'uni': '🎓', 'estudio': '📖',
+        'facultad': '🎓', 'uni': '🎓', 'estudio': '📖', 'universidad': '🎓',
         'dropshipping': '📦', 'negocio': '💼',
-        'recreativo': '🎮', 'ocio': '🎮',
+        'recreativo': '🎮', 'ocio': '🎮', 'recreacion': '🎮',
+        'programar': '💻', 'codigo': '💻',
     }
     for k, v in m.items():
         if k in n:
@@ -438,7 +439,7 @@ with col_main:
             <div class="hero-body">
                 <div class="hero-pct">{pct_hoy}%</div>
                 <div class="hero-bar"><div class="hero-bar-fill" style="width:{pct_hoy}%"></div></div>
-                <div class="hero-meta">{completados_hoy} de {total_h} hábitos · {completados_hoy}h registradas · <span style="color:#C9A84C;">{streak} días</span></div>
+                <div class="hero-meta">{completados_hoy} de {total_h} hábitos · {completados_hoy} completados · <span style="color:#C9A84C;">{streak} días</span></div>
                 <div class="hero-habits">{hh}</div>
             </div>
         </div>
@@ -523,7 +524,8 @@ with col_main:
                 c = int(dd['completado'].sum()) if not dd.empty else 0
             v = int((c / total_h * 100) if total_h > 0 else 0)
             today = (i == 6)
-            donuts_html += svg_donut(v, 96 if today else 56, ft.strftime('%a'), today)
+            dia_es = ['Vie', 'Sáb', 'Dom', 'Lun', 'Mar', 'Mié', 'Jue'][ft.weekday()]
+            donuts_html += svg_donut(v, 96 if today else 56, dia_es, today)
         donuts_html += '</div>'
         if total_h > 0:
             st.markdown(donuts_html, unsafe_allow_html=True)
