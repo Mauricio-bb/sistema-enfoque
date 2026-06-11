@@ -153,30 +153,6 @@ if not registros.empty:
 if total_h > 0:
     pct_hoy = int(completados_hoy / total_h * 100)
 
-# ─── STREAKS ─────────────────────────────────────────────────────────────────
-
-streak = 0
-if total_h > 0 and not registros.empty:
-    fd = registros.groupby('fecha')['completado'].sum().reset_index()
-    fd = fd[fd['completado'] == total_h]
-    fs = set(fd['fecha'].tolist())
-    c = hoy - datetime.timedelta(days=1)
-    while str(c) in fs:
-        streak += 1
-        c -= datetime.timedelta(days=1)
-
-def habit_streak(hid):
-    if registros.empty:
-        return 0
-    hr = registros[(registros['habito_id'] == hid) & (registros['completado'] == 1)]
-    f = set(hr['fecha'].tolist())
-    s = 0
-    d = hoy - datetime.timedelta(days=1)
-    while str(d) in f:
-        s += 1
-        d -= datetime.timedelta(days=1)
-    return s
-
 # ─── EMOJI ───────────────────────────────────────────────────────────────────
 
 def emoji(n):
@@ -201,17 +177,95 @@ def emoji(n):
             return v
     return '📌'
 
-# ─── TOGGLE ──────────────────────────────────────────────────────────────────
+# ─── CHART CACHE ─────────────────────────────────────────────────────────────
 
-def toggle(hid):
-    if hid in completados_ids:
-        conn.execute("DELETE FROM registros WHERE habito_id=? AND fecha=?", (hid, fhs))
-    else:
-        conn.execute("INSERT INTO registros (habito_id,completado,fecha) VALUES (?,1,?)", (hid, fhs))
-    conn.commit()
-    st.cache_data.clear()
-    st.session_state.rev += 1
-    st.rerun()
+@st.cache_data(ttl=120)
+def build_donuts(_reg, _hab):
+    hoy_c = datetime.date.today()
+    th = len(_hab) if not _hab.empty else 0
+    ult7 = [(hoy_c - datetime.timedelta(days=i)) for i in range(6, -1, -1)]
+    figs = []
+    labels = []
+    for ft in ult7:
+        fs = str(ft)
+        c = 0
+        if not _reg.empty:
+            dd = _reg[_reg['fecha'] == fs]
+            c = int(dd['completado'].sum()) if not dd.empty else 0
+        v = int((c / th * 100) if th > 0 else 0)
+
+        if v == 100:
+            dc = ['#C9A84C', '#1A2D45']
+        elif v >= 50:
+            dc = ['#E8C97A', '#1A2D45']
+        elif v > 0:
+            dc = ['#243B55', '#1A2D45']
+        else:
+            dc = ['#1A2D45', '#1A2D45']
+
+        today = (ft == hoy_c)
+        h = 140 if today else 90
+
+        fig = go.Figure(go.Pie(
+            hole=.7, values=[v, 100 - v],
+            marker=dict(colors=dc, line=dict(color='rgba(0,0,0,0)', width=0)),
+            showlegend=False, textinfo='none', direction='clockwise', sort=False,
+        ))
+        ann = []
+        if v > 0:
+            ann.append(dict(
+                text=f"{v}%", x=0.5, y=0.5,
+                font=dict(size=16 if today else 12, color='#F0E6CC', family='JetBrains Mono', weight=600),
+                showarrow=False,
+            ))
+        fig.update_layout(
+            margin=dict(l=2, r=2, t=2, b=2),
+            height=h, paper_bgcolor='rgba(0,0,0,0)', annotations=ann,
+        )
+        figs.append(fig)
+        labels.append(ft.strftime('%a %d'))
+    return figs, labels
+
+@st.cache_data(ttl=120)
+def build_heatmap(_reg, _hab):
+    if _reg.empty or _hab.empty:
+        return None
+    rf = _reg.merge(_hab, left_on='habito_id', right_on='id')
+    mat = rf.pivot_table(index='nombre', columns='fecha', values='completado', aggfunc='max').fillna(0)
+    mat = mat[sorted(mat.columns)]
+
+    fig = go.Figure(data=go.Heatmap(
+        z=mat.values, x=list(mat.columns), y=list(mat.index),
+        colorscale=[[0.0, "#0D1B2A"], [0.01, "#1A2D45"], [0.5, "#8B6914"], [1.0, "#C9A84C"]],
+        showscale=False, xgap=4, ygap=4, hoverongaps=False,
+        hovertemplate='%{y}<br>%{x}<br>%{z}<extra></extra>',
+    ))
+    nd = len(mat.columns)
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=max(160, 44 * len(mat.index)),
+        xaxis=dict(
+            showgrid=False, side='top',
+            tickfont=dict(size=10, color='#9BA8B5', family='JetBrains Mono'),
+            tickangle=-45,
+            dtick=1 if nd <= 31 else max(1, nd // 30),
+        ),
+        yaxis=dict(showgrid=False, tickfont=dict(size=12, color='#F0E6CC'), autorange='reversed'),
+    )
+    return fig
+
+# ─── STREAKS ─────────────────────────────────────────────────────────────────
+
+streak = 0
+if total_h > 0 and not registros.empty:
+    fd = registros.groupby('fecha')['completado'].sum().reset_index()
+    fd = fd[fd['completado'] == total_h]
+    fs = set(fd['fecha'].tolist())
+    c = hoy - datetime.timedelta(days=1)
+    while str(c) in fs:
+        streak += 1
+        c -= datetime.timedelta(days=1)
 
 # ─── HERO ─────────────────────────────────────────────────────────────────────
 
@@ -244,110 +298,86 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-# ─── HABIT TRACKER ───────────────────────────────────────────────────────────
+# ─── HABIT TRACKER (fragment) ────────────────────────────────────────────────
 
-st.markdown("<h2 class='section-title'>✅ Registro de hoy</h2>", unsafe_allow_html=True)
+@st.fragment
+def habit_tracker():
+    conn_f = get_conn()
+    hab_f = pd.read_sql_query("SELECT * FROM habitos", conn_f)
+    reg_f = pd.read_sql_query("SELECT * FROM registros", conn_f)
 
-if not habitos.empty:
-    cols = st.columns(len(habitos))
-    for i, (_, r) in enumerate(habitos.iterrows()):
-        with cols[i]:
-            hid = r['id']
-            ya = hid in completados_ids
-            status = "completed" if ya else "pending"
-            hs = habit_streak(hid)
+    fhs_f = str(datetime.date.today())
 
-            st.markdown(f"""
-            <div class="hc {status}">
-                <span class="hc-icon">{emoji(r['nombre'])}</span>
-                <div class="hc-name">{r['nombre']}</div>
-                <div class="hc-streak{' active' if hs > 0 else ''}">{'🔥 '+str(hs)+'d' if hs > 0 else '—'}</div>
-            </div>
-            """, unsafe_allow_html=True)
+    cids = []
+    choy = 0
+    if not reg_f.empty:
+        hd = reg_f[reg_f['fecha'] == fhs_f]
+        choy = int(hd['completado'].sum())
+        cids = hd['habito_id'].tolist()
 
-            if st.button("✓ Hecho" if ya else "Marcar", key=f"h_{hid}", width='stretch'):
-                toggle(hid)
-else:
-    st.markdown('<div class="stAlert"><p>No hay hábitos todavía. Agregá uno desde el panel lateral.</p></div>', unsafe_allow_html=True)
+    th = len(hab_f)
+
+    def hstreak(hid):
+        if reg_f.empty:
+            return 0
+        hr = reg_f[(reg_f['habito_id'] == hid) & (reg_f['completado'] == 1)]
+        f = set(hr['fecha'].tolist())
+        s = 0
+        d = datetime.date.today() - datetime.timedelta(days=1)
+        while str(d) in f:
+            s += 1
+            d -= datetime.timedelta(days=1)
+        return s
+
+    st.markdown("<h2 class='section-title'>✅ Registro de hoy</h2>", unsafe_allow_html=True)
+
+    if not hab_f.empty:
+        cols_f = st.columns(len(hab_f))
+        for i, (_, r) in enumerate(hab_f.iterrows()):
+            with cols_f[i]:
+                hid = r['id']
+                ya = hid in cids
+                hs = hstreak(hid)
+
+                st.markdown(f"""
+                <div class="hc {'completed' if ya else 'pending'}">
+                    <span class="hc-icon">{emoji(r['nombre'])}</span>
+                    <div class="hc-name">{r['nombre']}</div>
+                    <div class="hc-streak{' active' if hs > 0 else ''}">{'🔥 '+str(hs)+'d' if hs > 0 else '—'}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                if st.button("✓ Hecho" if ya else "Marcar", key=f"h_{hid}", width='stretch'):
+                    if hid in cids:
+                        conn_f.execute("DELETE FROM registros WHERE habito_id=? AND fecha=?", (hid, fhs_f))
+                    else:
+                        conn_f.execute("INSERT INTO registros (habito_id,completado,fecha) VALUES (?,1,?)", (hid, fhs_f))
+                    conn_f.commit()
+                    st.session_state.rev += 1
+                    st.rerun(scope="fragment")
+    else:
+        st.markdown('<div class="stAlert"><p>No hay hábitos todavía. Agregá uno desde el panel lateral.</p></div>', unsafe_allow_html=True)
+
+habit_tracker()
 
 # ─── DONUTS ──────────────────────────────────────────────────────────────────
 
 st.markdown("<h2 class='section-title'>🗓️ Consistencia semanal</h2>", unsafe_allow_html=True)
 
+figs_d, labels_d = build_donuts(registros, habitos)
 cols_d = st.columns(7)
-ult7 = [(hoy - datetime.timedelta(days=i)) for i in range(6, -1, -1)]
-
 for i, col in enumerate(cols_d):
-    ft = ult7[i]
-    fs = str(ft)
-    c = 0
-    if not registros.empty:
-        dd = registros[registros['fecha'] == fs]
-        c = int(dd['completado'].sum()) if not dd.empty else 0
-
-    v = int((c / total_h * 100) if total_h > 0 else 0)
-
-    if v == 100:
-        dc = ['#C9A84C', '#1A2D45']
-    elif v >= 50:
-        dc = ['#E8C97A', '#1A2D45']
-    elif v > 0:
-        dc = ['#243B55', '#1A2D45']
-    else:
-        dc = ['#1A2D45', '#1A2D45']
-
-    today = (i == 6)
-    h = 140 if today else 90
-
     with col:
-        fig = go.Figure(go.Pie(
-            hole=.7, values=[v, 100 - v],
-            marker=dict(colors=dc, line=dict(color='rgba(0,0,0,0)', width=0)),
-            showlegend=False, textinfo='none', direction='clockwise', sort=False,
-        ))
-        ann = []
-        if v > 0:
-            ann.append(dict(
-                text=f"{v}%", x=0.5, y=0.5,
-                font=dict(size=16 if today else 12, color='#F0E6CC', family='JetBrains Mono', weight=600),
-                showarrow=False,
-            ))
-        fig.update_layout(
-            margin=dict(l=2, r=2, t=2, b=2),
-            height=h, paper_bgcolor='rgba(0,0,0,0)', annotations=ann,
-        )
-        st.plotly_chart(fig, width='stretch', key=f"d_{st.session_state.rev}_{i}")
-        st.markdown(f"<p class='donut-label'>{ft.strftime('%a %d')}</p>", unsafe_allow_html=True)
+        st.plotly_chart(figs_d[i], width='stretch', key=f"d_{i}")
+        st.markdown(f"<p class='donut-label'>{labels_d[i]}</p>", unsafe_allow_html=True)
 
 # ─── HEATMAP ─────────────────────────────────────────────────────────────────
 
 st.markdown("<h2 class='section-title'>📋 Matriz de consistencia</h2>", unsafe_allow_html=True)
 
-if not registros.empty and not habitos.empty:
-    rf = registros.merge(habitos, left_on='habito_id', right_on='id')
-    mat = rf.pivot_table(index='nombre', columns='fecha', values='completado', aggfunc='max').fillna(0)
-    mat = mat[sorted(mat.columns)]
-
-    fig = go.Figure(data=go.Heatmap(
-        z=mat.values, x=list(mat.columns), y=list(mat.index),
-        colorscale=[[0.0, "#0D1B2A"], [0.01, "#1A2D45"], [0.5, "#8B6914"], [1.0, "#C9A84C"]],
-        showscale=False, xgap=4, ygap=4, hoverongaps=False,
-        hovertemplate='%{y}<br>%{x}<br>%{z}<extra></extra>',
-    ))
-    nd = len(mat.columns)
-    fig.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=max(160, 44 * len(mat.index)),
-        xaxis=dict(
-            showgrid=False, side='top',
-            tickfont=dict(size=10, color='#9BA8B5', family='JetBrains Mono'),
-            tickangle=-45,
-            dtick=1 if nd <= 31 else max(1, nd // 30),
-        ),
-        yaxis=dict(showgrid=False, tickfont=dict(size=12, color='#F0E6CC'), autorange='reversed'),
-    )
-    st.plotly_chart(fig, width='stretch', key=f"hm_{st.session_state.rev}")
+fig_h = build_heatmap(registros, habitos)
+if fig_h is not None:
+    st.plotly_chart(fig_h, width='stretch', key="hm")
 else:
     st.markdown('<div class="stAlert"><p>Completá algunos hábitos para ver tu matriz de consistencia.</p></div>', unsafe_allow_html=True)
 
@@ -381,7 +411,7 @@ except Exception:
 with st.sidebar:
     st.markdown("<div style='font-size:22px;font-weight:700;color:#C9A84C;margin-bottom:24px;letter-spacing:0.5px;'>⚡ ENFOQUE</div>", unsafe_allow_html=True)
     st.markdown("<div class='sidebar-title'>⚙️ Gestión</div>", unsafe_allow_html=True)
-    nuevo = st.text_input("", placeholder="Nombre del hábito", label_visibility="collapsed")
+    nuevo = st.text_input("Nuevo hábito", placeholder="Nombre del hábito", label_visibility="collapsed")
     if st.button("Guardar", width='stretch'):
         if nuevo:
             conn.execute("INSERT INTO habitos (nombre) VALUES (?)", (nuevo,))
