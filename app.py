@@ -3,336 +3,185 @@ import sqlite3
 import pandas as pd
 import datetime
 import plotly.graph_objects as go
-import plotly.express as px
 
 st.set_page_config(page_title="Sistema de Enfoque", page_icon="🎯", layout="wide")
 
 st.markdown("""
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-* { font-family: 'DM Sans', system-ui, sans-serif; }
-.stApp {
-    background-color: #0D1B2A;
-    color: #F0E6CC;
-}
-.stApp > header { display: none; }
-.main > div { padding: 24px 32px; }
-h1, h2, h3, h4, h5, h6 {
-    font-family: 'DM Sans', sans-serif;
-    font-weight: 700;
-    color: #F0E6CC;
-}
-p, li, span, div { color: #F0E6CC; }
+*{font-family:'DM Sans',system-ui,sans-serif}
+.stApp{background-color:#0D1B2A;color:#F0E6CC}
+.stApp>header{display:none}
+.main>div{padding:24px 32px}
+h1,h2,h3,h4,h5,h6{font-family:'DM Sans',sans-serif;font-weight:700;color:#F0E6CC;margin:0}
+p,li,span,div,label{color:#F0E6CC}
+a{color:#C9A84C;text-decoration:none}
 
-/* ─── SCROLLBAR ─── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0D1B2A; }
-::-webkit-scrollbar-thumb { background: #1E3050; border-radius: 3px; }
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:#0D1B2A}
+::-webkit-scrollbar-thumb{background:#1E3050;border-radius:3px}
 
 /* ─── SIDEBAR ─── */
-section[data-testid="stSidebar"] {
-    background-color: #0D1B2A;
-    border-right: 1px solid #1E3050;
-}
-section[data-testid="stSidebar"] .stTextInput input {
-    background-color: #1A2D45;
-    border: 1px solid #1E3050;
-    color: #F0E6CC;
-    border-radius: 8px;
-    font-family: 'DM Sans', sans-serif;
-}
-section[data-testid="stSidebar"] .stTextInput input:focus {
-    border-color: #8B6914;
-    box-shadow: 0 0 0 2px rgba(201,168,76,0.15);
-}
-.sidebar-title {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 18px;
-    font-weight: 700;
-    color: #F0E6CC;
-    margin-bottom: 16px;
-    letter-spacing: 0.3px;
-}
+section[data-testid="stSidebar"]{background-color:#0D1B2A;border-right:1px solid #1E3050;padding-top:0}
+section[data-testid="stSidebar"] .stTextInput input{background-color:#1A2D45;border:1px solid #1E3050;color:#F0E6CC;border-radius:8px;font-family:'DM Sans',sans-serif}
+section[data-testid="stSidebar"] .stTextInput input:focus{border-color:#8B6914;box-shadow:0 0 0 2px rgba(201,168,76,0.15)}
+.sidebar-title{font-size:18px;font-weight:700;margin-bottom:16px;letter-spacing:0.3px}
+section[data-testid="stSidebar"] div.stButton>button{background:#243B55;border:1px solid #8B6914;color:#E8C97A;border-radius:10px;font-weight:600;transition:all .2s}
+section[data-testid="stSidebar"] div.stButton>button:hover{background:#1A2D45;border-color:#C9A84C;box-shadow:0 0 12px rgba(201,168,76,0.2)}
 
-/* ─── HERO CARD ─── */
-.hero-card {
-    background: linear-gradient(135deg, #0D1B2A 0%, #1A2D45 100%);
-    border: 1px solid #1E3050;
-    border-left: 3px solid #C9A84C;
-    border-radius: 12px;
-    padding: 24px 32px;
-    margin-bottom: 32px;
-}
-.hero-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-.hero-date {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 18px;
-    font-weight: 500;
-    color: #9BA8B5;
-}
-.hero-streak {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 15px;
-    font-weight: 600;
-    color: #E8C97A;
-    background: rgba(201,168,76,0.1);
-    padding: 4px 12px;
-    border-radius: 20px;
-    border: 1px solid rgba(201,168,76,0.2);
-}
-.hero-body { text-align: center; }
-.hero-progress-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 56px;
-    font-weight: 700;
-    color: #C9A84C;
-    line-height: 1;
-    margin-bottom: 12px;
-}
-.hero-progress-bar-bg {
-    width: 100%;
-    height: 10px;
-    background: #1A2D45;
-    border-radius: 5px;
-    overflow: hidden;
-    margin-bottom: 12px;
-}
-.hero-progress-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #8B6914, #C9A84C);
-    border-radius: 5px;
-    transition: width 0.5s ease;
-}
-.hero-subtext {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 15px;
-    color: #9BA8B5;
-    margin-bottom: 20px;
-}
-.hero-habits {
-    display: flex;
-    justify-content: center;
-    gap: 24px;
-    flex-wrap: wrap;
-}
-.hero-habit {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    color: #F0E6CC;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #1A2D45;
-    padding: 6px 14px;
-    border-radius: 8px;
-    border: 1px solid #1E3050;
-}
-.hero-habit-icon { font-size: 16px; }
+/* ─── HERO ─── */
+.hero-card{background:linear-gradient(135deg,#0D1B2A 0%,#1A2D45 100%);border:1px solid #1E3050;border-left:3px solid #C9A84C;border-radius:12px;padding:24px 32px;margin-bottom:32px}
+.hero-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.hero-date{font-size:18px;font-weight:500;color:#9BA8B5}
+.hero-streak{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;color:#E8C97A;background:rgba(201,168,76,0.1);padding:4px 14px;border-radius:20px;border:1px solid rgba(201,168,76,0.2)}
+.hero-body{text-align:center}
+.hero-progress-label{font-family:'JetBrains Mono',monospace;font-size:56px;font-weight:700;color:#C9A84C;line-height:1;margin-bottom:12px}
+.hero-progress-bar-bg{max-width:480px;margin:0 auto 12px;height:10px;background:#1A2D45;border-radius:5px;overflow:hidden}
+.hero-progress-bar-fill{height:100%;background:linear-gradient(90deg,#8B6914,#C9A84C);border-radius:5px;transition:width .6s ease}
+.hero-subtext{font-size:15px;color:#9BA8B5;margin-bottom:20px}
+.hero-habits{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+.hero-habit{font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:6px;background:#1A2D45;padding:6px 14px;border-radius:8px;border:1px solid #1E3050}
+.hero-habit-icon{font-size:15px}
 
 /* ─── SECTION TITLES ─── */
-.section-title {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 20px;
-    font-weight: 600;
-    color: #F0E6CC;
-    margin-bottom: 16px;
-    letter-spacing: 0.2px;
-}
+.section-title{font-size:20px;font-weight:600;margin-bottom:16px;letter-spacing:0.2px}
 
-/* ─── CHECK-IN CARDS ─── */
-.checkin-card {
-    background: #1A2D45;
-    border-radius: 10px 10px 0 0;
-    padding: 16px;
-    text-align: center;
-    border-top: 3px solid #1E3050;
-    border-left: 1px solid #1E3050;
-    border-right: 1px solid #1E3050;
-    min-height: 100px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
+/* ─── HABIT CARDS (column-as-card) ─── */
+div[data-testid="column"]{
+    background:#1A2D45;
+    border-radius:12px;
+    border:1px solid #1E3050;
+    border-top:3px solid #1E3050;
+    overflow:hidden;
+    transition:border-color .25s,border-top-color .35s;
 }
-.checkin-card.completed {
-    border-top-color: #C9A84C;
-    border-left-color: rgba(201,168,76,0.2);
-    border-right-color: rgba(201,168,76,0.2);
+div[data-testid="column"]:has(.hc.completed){
+    border-top-color:#C9A84C;
+    border-color:rgba(201,168,76,0.2);
 }
-.checkin-card.in-progress {
-    border-top-color: #E8C97A;
-    border-left-color: rgba(232,201,122,0.2);
-    border-right-color: rgba(232,201,122,0.2);
+div[data-testid="column"]:has(.hc.pending){
+    border-top-color:#1E3050;
 }
-.checkin-card.failed {
-    border-top-color: #E07070;
-    border-left-color: rgba(224,112,112,0.2);
-    border-right-color: rgba(224,112,112,0.2);
-}
-.checkin-icon { font-size: 28px; }
-.checkin-name {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 13px;
-    font-weight: 500;
-    color: #F0E6CC;
-}
+.hc{padding:16px 12px 10px;text-align:center}
+.hc-icon{font-size:28px;display:block;margin-bottom:2px}
+.hc-name{font-size:14px;font-weight:600;margin-bottom:2px}
+.hc-streak{font-size:11px;color:#9BA8B5;font-family:'JetBrains Mono',monospace}
+.hc-streak.active{color:#E8C97A}
 
-/* ─── BUTTONS ─── */
-div.stButton > button {
-    background: #243B55;
-    border-radius: 0 0 10px 10px;
-    border: 1px solid #8B6914;
-    border-top: none;
-    color: #E8C97A;
-    font-family: 'DM Sans', sans-serif;
-    font-weight: 600;
-    font-size: 13px;
-    transition: all 0.2s ease;
-    width: 100%;
+div[data-testid="column"]>div:last-child button{
+    background:transparent;
+    border:none;
+    border-top:1px solid rgba(255,255,255,0.06);
+    border-radius:0;
+    color:#9BA8B5;
+    font-family:'DM Sans',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    padding:10px;
+    width:100%;
+    cursor:pointer;
+    transition:background .2s,color .2s;
 }
-div.stButton > button:hover {
-    background: #1A2D45;
-    border-color: #C9A84C;
-    box-shadow: 0 0 12px rgba(201,168,76,0.2);
-    color: #C9A84C;
-}
-div.stButton > button:active {
-    background: #243B55;
-    border-color: #C9A84C;
-    color: #C9A84C;
-}
+div[data-testid="column"]:has(.hc.completed)>div:last-child button{color:#C9A84C}
+div[data-testid="column"]>div:last-child button:hover{background:rgba(201,168,76,0.08);color:#E8C97A}
 
-/* ─── DONUT LABELS ─── */
-.donut-label {
-    text-align: center;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 12px;
-    color: #9BA8B5;
-    margin-top: 4px;
-}
+/* ─── DONUTS ─── */
+.donut-label{text-align:center;font-size:11px;color:#9BA8B5;margin-top:2px;font-family:'JetBrains Mono',monospace}
 
-/* ─── FINANCE CARD ─── */
-.finance-card {
-    background: linear-gradient(135deg, #0D1B2A 0%, #1A2D45 100%);
-    border: 1px solid #1E3050;
-    border-left: 3px solid #C9A84C;
-    border-radius: 12px;
-    padding: 20px 32px;
-    margin-bottom: 32px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-.finance-emoji { font-size: 28px; }
-.finance-text {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 16px;
-    color: #9BA8B5;
-}
-.finance-amount {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 28px;
-    font-weight: 700;
-    color: #C9A84C;
-}
-
-/* ─── SIDEBAR BUTTON ─── */
-section[data-testid="stSidebar"] div.stButton > button {
-    background: #243B55;
-    border: 1px solid #8B6914;
-    color: #E8C97A;
-    border-radius: 10px;
-    font-weight: 600;
-    font-family: 'DM Sans', sans-serif;
-    transition: all 0.2s ease;
-}
-section[data-testid="stSidebar"] div.stButton > button:hover {
-    background: #1A2D45;
-    border-color: #C9A84C;
-    box-shadow: 0 0 12px rgba(201,168,76,0.2);
-}
+/* ─── FINANCE ─── */
+.finance-card{background:linear-gradient(135deg,#0D1B2A 0%,#1A2D45 100%);border:1px solid #1E3050;border-left:3px solid #C9A84C;border-radius:12px;padding:20px 32px;margin-bottom:32px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.finance-emoji{font-size:28px}
+.finance-text{font-size:16px;color:#9BA8B5}
+.finance-amount{font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;color:#C9A84C}
 
 /* ─── INFO BOX ─── */
-.stAlert {
-    background-color: #1A2D45 !important;
-    border: 1px solid #1E3050 !important;
-    border-left: 3px solid #8B6914 !important;
-    color: #F0E6CC !important;
-    border-radius: 8px !important;
-}
-.stAlert p { color: #F0E6CC !important; }
+.stAlert{background-color:#1A2D45!important;border:1px solid #1E3050!important;border-left:3px solid #8B6914!important;color:#F0E6CC!important;border-radius:8px!important}
+.stAlert p{color:#F0E6CC!important}
 
-/* ─── RESPONSIVE ─── */
-@media (max-width: 768px) {
-    .hero-progress-label { font-size: 36px; }
-    .hero-habits { gap: 12px; }
-    .hero-habit { font-size: 12px; padding: 4px 10px; }
+@media(max-width:768px){
+.main>div{padding:16px}
+.hero-card{padding:16px 20px}
+.hero-progress-label{font-size:36px}
+.hero-habits{gap:8px}
+.hero-habit{font-size:12px;padding:4px 10px}
+.hc{padding:12px 8px 8px}
+.hc-icon{font-size:22px}
+.hc-name{font-size:12px}
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ─── DB ──────────────────────────────────────────────────────────────────────
 
-def conectar():
-    conn = sqlite3.connect('sistema_enfoque.db')
+@st.cache_resource
+def get_conn():
+    conn = sqlite3.connect('sistema_enfoque.db', check_same_thread=False)
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
-@st.cache_data(ttl=3)
-def obtener_datos():
-    conn = conectar()
-    habitos = pd.read_sql_query("SELECT * FROM habitos", conn)
-    registros = pd.read_sql_query("SELECT * FROM registros", conn)
-    conn.close()
+@st.cache_data(ttl=60)
+def obtener_datos(_conn):
+    habitos = pd.read_sql_query("SELECT * FROM habitos", _conn)
+    registros = pd.read_sql_query("SELECT * FROM registros", _conn)
     return habitos, registros
 
-habitos, registros = obtener_datos()
+conn = get_conn()
+habitos, registros = obtener_datos(conn)
+
+if 'rev' not in st.session_state:
+    st.session_state.rev = 0
 
 # ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
 hoy = datetime.date.today()
-dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-fecha_label = f"{dias_semana[hoy.weekday()]} {hoy.day} de {meses[hoy.month - 1]}"
+fecha_label = f"{dias[hoy.weekday()]} {hoy.day} de {meses[hoy.month - 1]}"
 
 total_h = len(habitos) if not habitos.empty else 0
-fecha_hoy_str = str(hoy)
+fhs = str(hoy)
 
 completados_ids = []
 pct_hoy = 0
 completados_hoy = 0
 
 if not registros.empty:
-    completados_hoy = registros[registros['fecha'] == fecha_hoy_str]['completado'].sum()
-    completados_ids = registros[registros['fecha'] == fecha_hoy_str]['habito_id'].tolist()
+    hd = registros[registros['fecha'] == fhs]
+    completados_hoy = int(hd['completado'].sum())
+    completados_ids = hd['habito_id'].tolist()
 
 if total_h > 0:
     pct_hoy = int(completados_hoy / total_h * 100)
 
+# ─── STREAKS ─────────────────────────────────────────────────────────────────
+
 streak = 0
 if total_h > 0 and not registros.empty:
-    check_date = hoy - datetime.timedelta(days=1)
-    while True:
-        day_data = registros[registros['fecha'] == str(check_date)]
-        if not day_data.empty and day_data['completado'].sum() == total_h:
-            streak += 1
-            check_date -= datetime.timedelta(days=1)
-        else:
-            break
+    fd = registros.groupby('fecha')['completado'].sum().reset_index()
+    fd = fd[fd['completado'] == total_h]
+    fs = set(fd['fecha'].tolist())
+    c = hoy - datetime.timedelta(days=1)
+    while str(c) in fs:
+        streak += 1
+        c -= datetime.timedelta(days=1)
 
-# ─── EMOJI MAP ───────────────────────────────────────────────────────────────
+def habit_streak(hid):
+    if registros.empty:
+        return 0
+    hr = registros[(registros['habito_id'] == hid) & (registros['completado'] == 1)]
+    f = set(hr['fecha'].tolist())
+    s = 0
+    d = hoy - datetime.timedelta(days=1)
+    while str(d) in f:
+        s += 1
+        d -= datetime.timedelta(days=1)
+    return s
 
-def get_emoji(nombre):
-    name = nombre.lower()
-    emojis = {
+# ─── EMOJI ───────────────────────────────────────────────────────────────────
+
+def emoji(n):
+    n = n.lower()
+    m = {
         'programación': '💻', 'programacion': '💻', 'coding': '💻',
         'michishop': '🛍️', 'shop': '🛍️',
         'ejercicio': '🏋️', 'gym': '🏋️', 'entrenamiento': '🏋️', 'running': '🏃',
@@ -342,246 +191,186 @@ def get_emoji(nombre):
         'diario': '📝', 'journal': '📝',
         'ingles': '🇬🇧', 'english': '🇬🇧', 'inglés': '🇬🇧',
         'guitarra': '🎸', 'music': '🎸', 'música': '🎸',
+        'dios': '🙏', 'biblia': '📖',
+        'facultad': '🎓', 'uni': '🎓', 'estudio': '📖',
+        'dropshipping': '📦', 'negocio': '💼',
+        'recreativo': '🎮', 'ocio': '🎮',
     }
-    for key, icon in emojis.items():
-        if key in name:
-            return icon
+    for k, v in m.items():
+        if k in n:
+            return v
     return '📌'
+
+# ─── TOGGLE ──────────────────────────────────────────────────────────────────
+
+def toggle(hid):
+    if hid in completados_ids:
+        conn.execute("DELETE FROM registros WHERE habito_id=? AND fecha=?", (hid, fhs))
+    else:
+        conn.execute("INSERT INTO registros (habito_id,completado,fecha) VALUES (?,1,?)", (hid, fhs))
+    conn.commit()
+    st.cache_data.clear()
+    st.session_state.rev += 1
+    st.rerun()
 
 # ─── HERO ─────────────────────────────────────────────────────────────────────
 
 if total_h > 0:
-    hero_habits_html = ""
-    for _, row in habitos.iterrows():
-        completed = row['id'] in completados_ids
-        icon = get_emoji(row['nombre'])
-        status_icon = "✅" if completed else "⬜"
-        hero_habits_html += (
-            f'<span class="hero-habit">'
-            f'<span class="hero-habit-icon">{icon}</span>'
-            f'{row["nombre"]} {status_icon}'
-            f'</span>'
-        )
-
-    streak_html = f'🔥 {streak} días consecutivos' if streak > 0 else ''
+    hh = "".join(
+        f'<span class="hero-habit"><span class="hero-habit-icon">{emoji(r["nombre"])}</span>'
+        f'{r["nombre"]} {"✅" if r["id"] in completados_ids else "⬜"}</span>'
+        for _, r in habitos.iterrows()
+    )
+    sh = f'🔥 {streak} días consecutivos' if streak > 0 else ''
     st.markdown(f"""
     <div class="hero-card">
         <div class="hero-top">
             <span class="hero-date">{fecha_label}</span>
-            {'<span class="hero-streak">' + streak_html + '</span>' if streak_html else ''}
+            {f'<span class="hero-streak">{sh}</span>' if sh else ''}
         </div>
         <div class="hero-body">
             <div class="hero-progress-label">{pct_hoy}%</div>
-            <div class="hero-progress-bar-bg">
-                <div class="hero-progress-bar-fill" style="width: {pct_hoy}%"></div>
-            </div>
+            <div class="hero-progress-bar-bg"><div class="hero-progress-bar-fill" style="width:{pct_hoy}%"></div></div>
             <div class="hero-subtext">{completados_hoy} de {total_h} hábitos completados hoy</div>
-            <div class="hero-habits">{hero_habits_html}</div>
+            <div class="hero-habits">{hh}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 else:
     st.markdown(f"""
     <div class="hero-card">
-        <div class="hero-top">
-            <span class="hero-date">{fecha_label}</span>
-        </div>
-        <div class="hero-body">
-            <div class="hero-subtext">Agregá tu primer hábito desde el panel lateral →</div>
-        </div>
+        <div class="hero-top"><span class="hero-date">{fecha_label}</span></div>
+        <div class="hero-body"><div class="hero-subtext">Agregá tu primer hábito desde el panel lateral →</div></div>
     </div>
     """, unsafe_allow_html=True)
 
-# ─── CHECK-IN ────────────────────────────────────────────────────────────────
+# ─── HABIT TRACKER ───────────────────────────────────────────────────────────
 
 st.markdown("<h2 class='section-title'>✅ Registro de hoy</h2>", unsafe_allow_html=True)
 
 if not habitos.empty:
-    cols_check = st.columns(len(habitos))
-    for i, (idx, row) in enumerate(habitos.iterrows()):
-        with cols_check[i]:
-            ya_completado = row['id'] in completados_ids
-            status_class = "completed" if ya_completado else "in-progress"
-            icon = get_emoji(row['nombre'])
-            label = "✓ Completado" if ya_completado else "Marcar completado"
+    cols = st.columns(len(habitos))
+    for i, (_, r) in enumerate(habitos.iterrows()):
+        with cols[i]:
+            hid = r['id']
+            ya = hid in completados_ids
+            status = "completed" if ya else "pending"
+            hs = habit_streak(hid)
 
             st.markdown(f"""
-            <div class="checkin-card {status_class}">
-                <div class="checkin-icon">{icon}</div>
-                <div class="checkin-name">{row['nombre']}</div>
+            <div class="hc {status}">
+                <span class="hc-icon">{emoji(r['nombre'])}</span>
+                <div class="hc-name">{r['nombre']}</div>
+                <div class="hc-streak{' active' if hs > 0 else ''}">{'🔥 '+str(hs)+'d' if hs > 0 else '—'}</div>
             </div>
             """, unsafe_allow_html=True)
 
-            if st.button(label, key=f"check_{row['id']}", use_container_width=True):
-                conn = conectar()
-                if ya_completado:
-                    conn.execute(
-                        "DELETE FROM registros WHERE habito_id = ? AND fecha = ?",
-                        (row['id'], fecha_hoy_str)
-                    )
-                else:
-                    conn.execute(
-                        "INSERT INTO registros (habito_id, completado, fecha) VALUES (?, 1, ?)",
-                        (row['id'], fecha_hoy_str)
-                    )
-                conn.commit()
-                conn.close()
-                st.cache_data.clear()
-                st.rerun()
+            if st.button("✓ Hecho" if ya else "Marcar", key=f"h_{hid}", width='stretch'):
+                toggle(hid)
 else:
-    st.markdown(
-        '<div class="stAlert"><p>No hay hábitos todavía. Agregá uno desde el panel lateral.</p></div>',
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="stAlert"><p>No hay hábitos todavía. Agregá uno desde el panel lateral.</p></div>', unsafe_allow_html=True)
 
 # ─── DONUTS ──────────────────────────────────────────────────────────────────
 
 st.markdown("<h2 class='section-title'>🗓️ Consistencia semanal</h2>", unsafe_allow_html=True)
 
-cols_donuts = st.columns(7)
-ultimos_7_dias = [(hoy - datetime.timedelta(days=i)) for i in range(6, -1, -1)]
+cols_d = st.columns(7)
+ult7 = [(hoy - datetime.timedelta(days=i)) for i in range(6, -1, -1)]
 
-for i, col in enumerate(cols_donuts):
-    fecha_target = ultimos_7_dias[i]
-    fecha_str = str(fecha_target)
-
-    completados = 0
+for i, col in enumerate(cols_d):
+    ft = ult7[i]
+    fs = str(ft)
+    c = 0
     if not registros.empty:
-        datos_dia = registros[registros['fecha'] == fecha_str]
-        completados = datos_dia['completado'].sum() if not datos_dia.empty else 0
+        dd = registros[registros['fecha'] == fs]
+        c = int(dd['completado'].sum()) if not dd.empty else 0
 
-    valor_pct = int((completados / total_h * 100) if total_h > 0 else 0)
+    v = int((c / total_h * 100) if total_h > 0 else 0)
 
-    if valor_pct == 100:
-        donut_colors = ['#C9A84C', '#1A2D45']
-    elif valor_pct >= 50:
-        donut_colors = ['#E8C97A', '#1A2D45']
-    elif valor_pct > 0:
-        donut_colors = ['#243B55', '#1A2D45']
+    if v == 100:
+        dc = ['#C9A84C', '#1A2D45']
+    elif v >= 50:
+        dc = ['#E8C97A', '#1A2D45']
+    elif v > 0:
+        dc = ['#243B55', '#1A2D45']
     else:
-        donut_colors = ['#1A2D45', '#1A2D45']
+        dc = ['#1A2D45', '#1A2D45']
 
-    is_today = (i == 6)
-    height = 140 if is_today else 90
+    today = (i == 6)
+    h = 140 if today else 90
 
     with col:
-        fig_donut = go.Figure(go.Pie(
-            hole=.7,
-            values=[valor_pct, 100 - valor_pct],
-            marker=dict(colors=donut_colors, line=dict(
-                color='rgba(0,0,0,0)', width=0
-            )),
-            showlegend=False,
-            textinfo='none',
-            direction='clockwise',
-            sort=False,
+        fig = go.Figure(go.Pie(
+            hole=.7, values=[v, 100 - v],
+            marker=dict(colors=dc, line=dict(color='rgba(0,0,0,0)', width=0)),
+            showlegend=False, textinfo='none', direction='clockwise', sort=False,
         ))
-        annotations = []
-        if valor_pct > 0:
-            annotations.append(dict(
-                text=f"{valor_pct}%",
-                x=0.5, y=0.5,
-                font=dict(
-                    size=16 if is_today else 12,
-                    color='#F0E6CC',
-                    family='JetBrains Mono',
-                    weight=600,
-                ),
+        ann = []
+        if v > 0:
+            ann.append(dict(
+                text=f"{v}%", x=0.5, y=0.5,
+                font=dict(size=16 if today else 12, color='#F0E6CC', family='JetBrains Mono', weight=600),
                 showarrow=False,
             ))
-        fig_donut.update_layout(
-            margin=dict(l=4, r=4, t=4, b=4),
-            height=height,
-            paper_bgcolor='rgba(0,0,0,0)',
-            annotations=annotations,
+        fig.update_layout(
+            margin=dict(l=2, r=2, t=2, b=2),
+            height=h, paper_bgcolor='rgba(0,0,0,0)', annotations=ann,
         )
-        st.plotly_chart(fig_donut, use_container_width=True, key=f"donut_{i}")
-        st.markdown(
-            f"<p class='donut-label'>{fecha_target.strftime('%a %d')}</p>",
-            unsafe_allow_html=True
-        )
+        st.plotly_chart(fig, width='stretch', key=f"d_{st.session_state.rev}_{i}")
+        st.markdown(f"<p class='donut-label'>{ft.strftime('%a %d')}</p>", unsafe_allow_html=True)
 
 # ─── HEATMAP ─────────────────────────────────────────────────────────────────
 
 st.markdown("<h2 class='section-title'>📋 Matriz de consistencia</h2>", unsafe_allow_html=True)
 
 if not registros.empty and not habitos.empty:
-    registros_full = registros.merge(habitos, left_on='habito_id', right_on='id')
-    matrix = registros_full.pivot_table(
-        index='nombre', columns='fecha', values='completado', aggfunc='max'
-    ).fillna(0)
+    rf = registros.merge(habitos, left_on='habito_id', right_on='id')
+    mat = rf.pivot_table(index='nombre', columns='fecha', values='completado', aggfunc='max').fillna(0)
+    mat = mat[sorted(mat.columns)]
 
-    fig_heatmap = go.Figure(data=go.Heatmap(
-        z=matrix.values,
-        x=list(matrix.columns),
-        y=list(matrix.index),
-        colorscale=[
-            [0.0, "#0D1B2A"],
-            [0.01, "#1A2D45"],
-            [0.5, "#8B6914"],
-            [1.0, "#C9A84C"],
-        ],
-        showscale=False,
-        xgap=4,
-        ygap=4,
-        hoverongaps=False,
+    fig = go.Figure(data=go.Heatmap(
+        z=mat.values, x=list(mat.columns), y=list(mat.index),
+        colorscale=[[0.0, "#0D1B2A"], [0.01, "#1A2D45"], [0.5, "#8B6914"], [1.0, "#C9A84C"]],
+        showscale=False, xgap=4, ygap=4, hoverongaps=False,
         hovertemplate='%{y}<br>%{x}<br>%{z}<extra></extra>',
     ))
-
-    n_dates = len(matrix.columns)
-    height = max(160, 40 * len(matrix.index))
-
-    fig_heatmap.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
+    nd = len(mat.columns)
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(l=0, r=0, t=0, b=0),
-        height=height,
+        height=max(160, 44 * len(mat.index)),
         xaxis=dict(
-            showgrid=False,
-            side='top',
+            showgrid=False, side='top',
             tickfont=dict(size=10, color='#9BA8B5', family='JetBrains Mono'),
             tickangle=-45,
-            dtick=1 if n_dates <= 31 else max(1, n_dates // 30),
+            dtick=1 if nd <= 31 else max(1, nd // 30),
         ),
-        yaxis=dict(
-            showgrid=False,
-            tickfont=dict(size=12, color='#F0E6CC'),
-            autorange='reversed',
-        ),
+        yaxis=dict(showgrid=False, tickfont=dict(size=12, color='#F0E6CC'), autorange='reversed'),
     )
-    st.plotly_chart(fig_heatmap, use_container_width=True, key="heatmap")
+    st.plotly_chart(fig, width='stretch', key=f"hm_{st.session_state.rev}")
 else:
-    st.markdown(
-        '<div class="stAlert"><p>Completá algunos hábitos para ver tu matriz de consistencia.</p></div>',
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="stAlert"><p>Completá algunos hábitos para ver tu matriz de consistencia.</p></div>', unsafe_allow_html=True)
 
-# ─── FINANCE TRACKER ─────────────────────────────────────────────────────────
+# ─── FINANCE ─────────────────────────────────────────────────────────────────
 
 try:
-    conn_fin = conectar()
-    metas_df = pd.read_sql_query(
-        "SELECT * FROM metas WHERE completada = 0 ORDER BY fecha_fin LIMIT 1",
-        conn_fin
+    metas = pd.read_sql_query(
+        "SELECT * FROM metas WHERE completada = 0 ORDER BY fecha_fin LIMIT 1", conn
     )
-    conn_fin.close()
-    if not metas_df.empty:
-        meta = metas_df.iloc[0]
-        restante = float(meta['monto_meta']) - float(meta['monto_actual'])
-        hoy_ts = pd.Timestamp.today()
-        fecha_fin = pd.to_datetime(meta['fecha_fin'])
-        dias_restantes = (fecha_fin - hoy_ts).days
-        if dias_restantes > 0:
-            diario = restante / dias_restantes
+    if not metas.empty:
+        m = metas.iloc[0]
+        rest = float(m['monto_meta']) - float(m['monto_actual'])
+        ff = pd.to_datetime(m['fecha_fin'])
+        dr = (ff - pd.Timestamp.today()).days
+        if dr > 0:
+            d = rest / dr
             st.markdown(f"""
             <div class="finance-card">
                 <span class="finance-emoji">💰</span>
                 <span class="finance-text">Necesitás </span>
-                <span class="finance-amount">${diario:.2f}</span>
-                <span class="finance-text">/día para llegar a tu meta — {meta['nombre']}</span>
-                <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9BA8B5;margin-left:auto;">
-                    {restante:.0f} restantes · {dias_restantes}d
-                </span>
+                <span class="finance-amount">${d:.2f}</span>
+                <span class="finance-text">/día — {m['nombre']}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9BA8B5;margin-left:auto;">{rest:.0f} rest · {dr}d</span>
             </div>
             """, unsafe_allow_html=True)
 except Exception:
@@ -591,20 +380,14 @@ except Exception:
 
 with st.sidebar:
     st.markdown("<div style='font-size:22px;font-weight:700;color:#C9A84C;margin-bottom:24px;letter-spacing:0.5px;'>⚡ ENFOQUE</div>", unsafe_allow_html=True)
-    st.markdown("<h2 class='sidebar-title'>⚙️ Gestión</h2>", unsafe_allow_html=True)
-    nuevo = st.text_input("Añadir nuevo reto:", placeholder="Nombre del hábito")
-    if st.button("Guardar", use_container_width=True):
+    st.markdown("<div class='sidebar-title'>⚙️ Gestión</div>", unsafe_allow_html=True)
+    nuevo = st.text_input("", placeholder="Nombre del hábito", label_visibility="collapsed")
+    if st.button("Guardar", width='stretch'):
         if nuevo:
-            conn = conectar()
             conn.execute("INSERT INTO habitos (nombre) VALUES (?)", (nuevo,))
             conn.commit()
-            conn.close()
             st.cache_data.clear()
+            st.session_state.rev += 1
             st.rerun()
-
     st.markdown("<hr style='border-color:#1E3050;margin:24px 0;'>", unsafe_allow_html=True)
-    st.markdown(
-        "<p style='font-family:DM Sans;font-size:12px;color:#9BA8B5;text-align:center;'>"
-        "Sistema de Enfoque v2 · Navy + Gold</p>",
-        unsafe_allow_html=True
-    )
+    st.markdown("<p style='font-size:12px;color:#9BA8B5;text-align:center;'>Sistema de Enfoque v3 · Navy + Gold</p>", unsafe_allow_html=True)
