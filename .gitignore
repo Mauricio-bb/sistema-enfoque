@@ -1,2 +1,9 @@
-env/
+*.db
+*.db.bak*
 __pycache__/
+*.pyc
+.streamlit/
+env/
+*.log
+*.pid
+.env
